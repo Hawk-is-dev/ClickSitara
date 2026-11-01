@@ -373,29 +373,35 @@ def load_accounts() -> list:
     if "SESSION_STRING" in os.environ and "SESSION_STRING_1" not in os.environ:
         os.environ["SESSION_STRING_1"] = os.environ["SESSION_STRING"]
 
-    i = 1
-    while True:
+    def _clean(v):
+        if v is None:
+            return v
+        return v.strip().strip("\"'").strip()
+
+    for i in range(1, 51):
         session_key = f"SESSION_STRING_{i}"
         if session_key not in os.environ:
-            break
+            continue
 
-        def get(key_base, default=None, required=False):
+        def get(key_base, default=None, required=False, i=i):
             val = os.environ.get(f"{key_base}_{i}", os.environ.get(key_base, default))
             if required and val is None:
                 raise RuntimeError(f"Missing required env var: {key_base}_{i} or {key_base}")
-            return val
+            return _clean(val)
 
-        accounts.append(Account(
-            name=f"account{i}",
-            api_id=int(get("API_ID", required=True)),
-            api_hash=get("API_HASH", required=True),
-            session_string=os.environ[session_key],
-            target_bot=get("TARGET_BOT", required=True),
-            notify_chat=get("NOTIFY_CHAT", default="me"),
-            interval_minutes=int(get("INTERVAL_MINUTES", default="10")),
-            button_text=get("BUTTON_TEXT", default="Кликер"),
-        ))
-        i += 1
+        try:
+            accounts.append(Account(
+                name=f"account{i}",
+                api_id=int(get("API_ID", required=True)),
+                api_hash=get("API_HASH", required=True),
+                session_string=_clean(os.environ[session_key]),
+                target_bot=get("TARGET_BOT", required=True),
+                notify_chat=get("NOTIFY_CHAT", default="me"),
+                interval_minutes=int(get("INTERVAL_MINUTES", default="10")),
+                button_text=get("BUTTON_TEXT", default="Кликер"),
+            ))
+        except Exception as e:
+            print(f"[SKIPPED] {session_key} is invalid ({type(e).__name__}: {e}). Fix or delete this variable.", flush=True)
 
     if not accounts:
         raise RuntimeError(
